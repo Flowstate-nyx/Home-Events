@@ -19,6 +19,10 @@ export function initPool() {
   
   const config = getConfig();
   
+  // Log SSL configuration
+  console.log('Database SSL config:', config.database.ssl);
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  
   pool = new Pool({
     connectionString: config.database.url,
     ssl: config.database.ssl,
@@ -28,10 +32,12 @@ export function initPool() {
   });
   
   pool.on('error', (err) => {
+    console.error('Pool error:', err.message);
     logger.error('Unexpected pool error', { error: err.message });
   });
   
   pool.on('connect', () => {
+    console.log('New database client connected');
     logger.debug('New database client connected');
   });
   
@@ -103,11 +109,27 @@ export async function transaction(callback) {
  */
 export async function testConnection() {
   try {
+    // Log connection attempt details (without password)
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) {
+      console.error('FATAL: DATABASE_URL is not set!');
+      return false;
+    }
+    
+    // Mask password in log
+    const maskedUrl = dbUrl.replace(/:([^:@]+)@/, ':****@');
+    console.log('Attempting database connection to:', maskedUrl);
+    
     const result = await queryOne('SELECT NOW() as now, current_database() as db');
     logger.info('Database connected', { database: result.db, time: result.now });
+    console.log('✅ Database connected successfully to:', result.db);
     return true;
   } catch (err) {
-    logger.error('Database connection failed', { error: err.message });
+    console.error('❌ Database connection failed!');
+    console.error('Error code:', err.code);
+    console.error('Error message:', err.message);
+    console.error('Full error:', err);
+    logger.error('Database connection failed', { error: err.message, code: err.code });
     return false;
   }
 }

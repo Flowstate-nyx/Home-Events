@@ -182,15 +182,44 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 // START SERVER
 // ============================================
 
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function connectWithRetry(maxRetries = 5, delayMs = 3000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    console.log(`Database connection attempt ${attempt}/${maxRetries}...`);
+    
+    const connected = await db.testConnection();
+    
+    if (connected) {
+      console.log('✅ Database connected successfully!');
+      return true;
+    }
+    
+    if (attempt < maxRetries) {
+      console.log(`Retrying in ${delayMs/1000} seconds...`);
+      await sleep(delayMs);
+    }
+  }
+  
+  console.error('❌ All database connection attempts failed!');
+  return false;
+}
+
 async function start() {
   try {
+    console.log('Starting Home Productions Backend v4.0...');
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    
     // Initialize database pool
     db.initPool();
     
-    // Test connection
-    const connected = await db.testConnection();
+    // Test connection with retry
+    const connected = await connectWithRetry(5, 3000);
     if (!connected) {
-      logger.error('Database connection failed');
+      logger.error('Database connection failed after all retries');
       process.exit(1);
     }
     

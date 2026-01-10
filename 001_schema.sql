@@ -3,6 +3,21 @@
 -- Production-safe ticketing system
 -- ============================================
 
+-- RESET: Drop old tables if they exist (safe for fresh deployments)
+-- Remove this section after first successful deployment if you want to preserve data
+DROP TABLE IF EXISTS checkins CASCADE;
+DROP TABLE IF EXISTS email_outbox CASCADE;
+DROP TABLE IF EXISTS audit_logs CASCADE;
+DROP TABLE IF EXISTS gallery_images CASCADE;
+DROP TABLE IF EXISTS galleries CASCADE;
+DROP TABLE IF EXISTS newsletter_subscribers CASCADE;
+DROP TABLE IF EXISTS orders CASCADE;
+DROP TABLE IF EXISTS ticket_tiers CASCADE;
+DROP TABLE IF EXISTS events CASCADE;
+DROP TABLE IF EXISTS refresh_tokens CASCADE;
+DROP TABLE IF EXISTS settings CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
 -- Enable extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -22,8 +37,8 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_active ON users(is_active) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active) WHERE is_active = true;
 
 -- ============================================
 -- REFRESH TOKENS
@@ -38,9 +53,9 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     CONSTRAINT refresh_tokens_not_expired CHECK (expires_at > created_at)
 );
 
-CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
-CREATE INDEX idx_refresh_tokens_expires ON refresh_tokens(expires_at) WHERE revoked_at IS NULL;
-CREATE INDEX idx_refresh_tokens_hash ON refresh_tokens(token_hash) WHERE revoked_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires ON refresh_tokens(expires_at) WHERE revoked_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash ON refresh_tokens(token_hash) WHERE revoked_at IS NULL;
 
 -- ============================================
 -- EVENTS
@@ -69,10 +84,10 @@ CREATE TABLE IF NOT EXISTS events (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_events_status ON events(status);
-CREATE INDEX idx_events_date ON events(event_date);
-CREATE INDEX idx_events_slug ON events(slug) WHERE slug IS NOT NULL;
-CREATE INDEX idx_events_active ON events(status) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
+CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
+CREATE INDEX IF NOT EXISTS idx_events_slug ON events(slug) WHERE slug IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_events_active ON events(status) WHERE status = 'active';
 
 -- ============================================
 -- TICKET TIERS
@@ -97,8 +112,8 @@ CREATE TABLE IF NOT EXISTS ticket_tiers (
     CONSTRAINT tier_sold_not_exceed_quantity CHECK (sold <= quantity)
 );
 
-CREATE INDEX idx_tiers_event ON ticket_tiers(event_id);
-CREATE INDEX idx_tiers_active ON ticket_tiers(is_active) WHERE is_active = true;
+CREATE INDEX IF NOT EXISTS idx_tiers_event ON ticket_tiers(event_id);
+CREATE INDEX IF NOT EXISTS idx_tiers_active ON ticket_tiers(is_active) WHERE is_active = true;
 
 -- ============================================
 -- ORDERS
@@ -148,14 +163,14 @@ CREATE TABLE IF NOT EXISTS orders (
     refunded_at TIMESTAMP WITH TIME ZONE
 );
 
-CREATE INDEX idx_orders_number ON orders(order_number);
-CREATE INDEX idx_orders_event ON orders(event_id);
-CREATE INDEX idx_orders_tier ON orders(tier_id);
-CREATE INDEX idx_orders_email ON orders(buyer_email);
-CREATE INDEX idx_orders_status ON orders(status);
-CREATE INDEX idx_orders_qr_hash ON orders(qr_code_hash);
-CREATE INDEX idx_orders_created ON orders(created_at DESC);
-CREATE INDEX idx_orders_paid ON orders(status) WHERE status = 'paid';
+CREATE INDEX IF NOT EXISTS idx_orders_number ON orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_orders_event ON orders(event_id);
+CREATE INDEX IF NOT EXISTS idx_orders_tier ON orders(tier_id);
+CREATE INDEX IF NOT EXISTS idx_orders_email ON orders(buyer_email);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_qr_hash ON orders(qr_code_hash);
+CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_paid ON orders(status) WHERE status = 'paid';
 
 -- ============================================
 -- CHECKINS (Separate audit trail)
@@ -171,8 +186,8 @@ CREATE TABLE IF NOT EXISTS checkins (
     CONSTRAINT unique_order_checkin UNIQUE (order_id)
 );
 
-CREATE INDEX idx_checkins_order ON checkins(order_id);
-CREATE INDEX idx_checkins_time ON checkins(checked_in_at DESC);
+CREATE INDEX IF NOT EXISTS idx_checkins_order ON checkins(order_id);
+CREATE INDEX IF NOT EXISTS idx_checkins_time ON checkins(checked_in_at DESC);
 
 -- ============================================
 -- EMAIL OUTBOX (Decoupled email sending)
@@ -183,7 +198,6 @@ CREATE TABLE IF NOT EXISTS email_outbox (
     email_type VARCHAR(50) NOT NULL CHECK (email_type IN ('ticket', 'confirmation', 'reminder', 'refund')),
     recipient_email VARCHAR(255) NOT NULL,
     subject VARCHAR(500) NOT NULL,
-    qr_plaintext TEXT,
     status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'sent', 'failed')),
     attempts INTEGER NOT NULL DEFAULT 0,
     last_attempt_at TIMESTAMP WITH TIME ZONE,
@@ -193,9 +207,9 @@ CREATE TABLE IF NOT EXISTS email_outbox (
     CONSTRAINT max_email_attempts CHECK (attempts <= 5)
 );
 
-CREATE INDEX idx_email_outbox_order ON email_outbox(order_id);
-CREATE INDEX idx_email_outbox_pending ON email_outbox(status) WHERE status IN ('pending', 'failed');
-CREATE INDEX idx_email_outbox_type ON email_outbox(order_id, email_type);
+CREATE INDEX IF NOT EXISTS idx_email_outbox_order ON email_outbox(order_id);
+CREATE INDEX IF NOT EXISTS idx_email_outbox_pending ON email_outbox(status) WHERE status IN ('pending', 'failed');
+CREATE INDEX IF NOT EXISTS idx_email_outbox_type ON email_outbox(order_id, email_type);
 
 -- ============================================
 -- AUDIT LOGS
@@ -213,20 +227,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
-CREATE INDEX idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
-CREATE INDEX idx_audit_logs_action ON audit_logs(action);
-CREATE INDEX idx_audit_logs_created ON audit_logs(created_at DESC);
-
--- ============================================
--- SETTINGS
--- ============================================
-CREATE TABLE IF NOT EXISTS settings (
-    key VARCHAR(100) PRIMARY KEY,
-    value JSONB NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_by UUID REFERENCES users(id)
-);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
 
 -- ============================================
 -- GALLERIES
@@ -277,6 +281,16 @@ CREATE TABLE IF NOT EXISTS newsletter_subscribers (
 CREATE INDEX IF NOT EXISTS idx_newsletter_email ON newsletter_subscribers(email);
 
 -- ============================================
+-- SETTINGS
+-- ============================================
+CREATE TABLE IF NOT EXISTS settings (
+    key VARCHAR(100) PRIMARY KEY,
+    value JSONB NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by UUID REFERENCES users(id)
+);
+
+-- ============================================
 -- FUNCTIONS
 -- ============================================
 
@@ -289,97 +303,26 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Generate order number
-CREATE OR REPLACE FUNCTION generate_order_number()
-RETURNS VARCHAR(50) AS $$
-DECLARE
-    result VARCHAR(50);
-BEGIN
-    result := 'HP' || TO_CHAR(CURRENT_TIMESTAMP, 'YYMMDD') || '-' || 
-              UPPER(SUBSTRING(encode(gen_random_bytes(4), 'hex') FROM 1 FOR 8));
-    RETURN result;
-END;
-$$ LANGUAGE plpgsql;
-
--- Generate QR code (returns plaintext, caller must hash for storage)
-CREATE OR REPLACE FUNCTION generate_qr_code()
-RETURNS VARCHAR(64) AS $$
-BEGIN
-    RETURN UPPER(encode(gen_random_bytes(16), 'hex'));
-END;
-$$ LANGUAGE plpgsql;
-
--- Hash QR code for storage
-CREATE OR REPLACE FUNCTION hash_qr_code(plaintext VARCHAR)
-RETURNS VARCHAR(64) AS $$
-BEGIN
-    RETURN encode(digest(plaintext, 'sha256'), 'hex');
-END;
-$$ LANGUAGE plpgsql;
-
--- Reserve inventory (atomic with FOR UPDATE)
-CREATE OR REPLACE FUNCTION reserve_inventory(
-    p_tier_id UUID,
-    p_quantity INTEGER
-)
-RETURNS BOOLEAN AS $$
-DECLARE
-    v_available INTEGER;
-BEGIN
-    -- Lock the row and check availability
-    SELECT quantity - sold INTO v_available
-    FROM ticket_tiers
-    WHERE id = p_tier_id
-    FOR UPDATE;
-    
-    IF v_available IS NULL THEN
-        RAISE EXCEPTION 'Tier not found: %', p_tier_id;
-    END IF;
-    
-    IF v_available < p_quantity THEN
-        RETURN FALSE;
-    END IF;
-    
-    -- Update sold count
-    UPDATE ticket_tiers
-    SET sold = sold + p_quantity,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = p_tier_id;
-    
-    RETURN TRUE;
-END;
-$$ LANGUAGE plpgsql;
-
--- Release inventory (for refunds/cancellations)
-CREATE OR REPLACE FUNCTION release_inventory(
-    p_tier_id UUID,
-    p_quantity INTEGER
-)
-RETURNS VOID AS $$
-BEGIN
-    UPDATE ticket_tiers
-    SET sold = GREATEST(0, sold - p_quantity),
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = p_tier_id;
-END;
-$$ LANGUAGE plpgsql;
-
 -- ============================================
 -- TRIGGERS
 -- ============================================
 
+DROP TRIGGER IF EXISTS trg_users_updated_at ON users;
 CREATE TRIGGER trg_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS trg_events_updated_at ON events;
 CREATE TRIGGER trg_events_updated_at
     BEFORE UPDATE ON events
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS trg_ticket_tiers_updated_at ON ticket_tiers;
 CREATE TRIGGER trg_ticket_tiers_updated_at
     BEFORE UPDATE ON ticket_tiers
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS trg_orders_updated_at ON orders;
 CREATE TRIGGER trg_orders_updated_at
     BEFORE UPDATE ON orders
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
@@ -401,6 +344,4 @@ ON CONFLICT (key) DO NOTHING;
 COMMENT ON TABLE orders IS 'Immutable order records - only status field changes';
 COMMENT ON COLUMN orders.qr_code_hash IS 'SHA-256 hash of QR code for secure lookup';
 COMMENT ON TABLE email_outbox IS 'Decoupled email queue with retry support';
-COMMENT ON COLUMN email_outbox.qr_plaintext IS 'Temporary QR plaintext for email generation - MUST be NULL after send';
 COMMENT ON TABLE checkins IS 'Separate check-in records for audit trail';
-COMMENT ON FUNCTION reserve_inventory IS 'Atomic inventory reservation using FOR UPDATE';

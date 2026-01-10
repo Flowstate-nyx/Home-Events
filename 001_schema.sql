@@ -4,19 +4,26 @@
 -- ============================================
 
 -- RESET: Drop old tables if they exist (safe for fresh deployments)
--- Remove this section after first successful deployment if you want to preserve data
-DROP TABLE IF EXISTS checkins CASCADE;
-DROP TABLE IF EXISTS email_outbox CASCADE;
-DROP TABLE IF EXISTS audit_logs CASCADE;
-DROP TABLE IF EXISTS gallery_images CASCADE;
-DROP TABLE IF EXISTS galleries CASCADE;
-DROP TABLE IF EXISTS newsletter_subscribers CASCADE;
-DROP TABLE IF EXISTS orders CASCADE;
-DROP TABLE IF EXISTS ticket_tiers CASCADE;
-DROP TABLE IF EXISTS events CASCADE;
-DROP TABLE IF EXISTS refresh_tokens CASCADE;
-DROP TABLE IF EXISTS settings CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
+-- Drop in reverse order of dependencies to avoid constraint issues
+DO $$ 
+BEGIN
+    -- Drop tables with CASCADE to handle all dependencies
+    DROP TABLE IF EXISTS checkins CASCADE;
+    DROP TABLE IF EXISTS email_outbox CASCADE;
+    DROP TABLE IF EXISTS audit_logs CASCADE;
+    DROP TABLE IF EXISTS gallery_images CASCADE;
+    DROP TABLE IF EXISTS galleries CASCADE;
+    DROP TABLE IF EXISTS newsletter_subscribers CASCADE;
+    DROP TABLE IF EXISTS orders CASCADE;
+    DROP TABLE IF EXISTS ticket_tiers CASCADE;
+    DROP TABLE IF EXISTS events CASCADE;
+    DROP TABLE IF EXISTS refresh_tokens CASCADE;
+    DROP TABLE IF EXISTS settings CASCADE;
+    DROP TABLE IF EXISTS users CASCADE;
+EXCEPTION WHEN OTHERS THEN
+    -- Ignore errors if tables don't exist
+    NULL;
+END $$;
 
 -- Enable extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -325,6 +332,11 @@ CREATE TRIGGER trg_ticket_tiers_updated_at
 DROP TRIGGER IF EXISTS trg_orders_updated_at ON orders;
 CREATE TRIGGER trg_orders_updated_at
     BEFORE UPDATE ON orders
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+DROP TRIGGER IF EXISTS trg_galleries_updated_at ON galleries;
+CREATE TRIGGER trg_galleries_updated_at
+    BEFORE UPDATE ON galleries
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ============================================

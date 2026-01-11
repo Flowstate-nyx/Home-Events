@@ -26,7 +26,7 @@ function DashboardLayout() {
   const title = pageTitles[location.pathname] || 'Dashboard';
 
   return (
-    <div className="min-h-screen bg-brand-green flex">
+    <div className="h-screen bg-brand-green flex overflow-hidden">
       {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -34,15 +34,15 @@ function DashboardLayout() {
       />
 
       {/* Main content area */}
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-0">
+      <div className="flex flex-col flex-1 overflow-hidden">
         {/* Header */}
         <Header
           onMenuClick={() => setSidebarOpen(true)}
           title={title}
         />
 
-        {/* Page content */}
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
+        {/* Scrollable page content */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
           <Outlet />
         </main>
       </div>

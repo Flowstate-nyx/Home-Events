@@ -443,218 +443,267 @@ function Events() {
         title={editingEvent ? 'Edit Event' : 'Create Event'}
         size="xl"
       >
-        <div className="max-h-[calc(100vh-12rem)] overflow-y-auto">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Basic Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-brand-cream/80 mb-1">Event Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => handleFieldChange('name', e.target.value)}
-                  className={`input-field ${formErrors.name ? 'border-red-500' : ''}`}
-                  placeholder="NYE 2026 Party"
-                />
-                {formErrors.name && <p className="text-red-400 text-xs mt-1">{formErrors.name}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-brand-cream/80 mb-1">Location *</label>
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => handleFieldChange('location', e.target.value)}
-                  className={`input-field ${formErrors.location ? 'border-red-500' : ''}`}
-                  placeholder="Guatemala City, Guatemala"
-                />
-                {formErrors.location && <p className="text-red-400 text-xs mt-1">{formErrors.location}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-brand-cream/80 mb-1">Venue</label>
-                <input
-                  type="text"
-                  value={formData.venue}
-                  onChange={(e) => handleFieldChange('venue', e.target.value)}
-                  className="input-field"
-                  placeholder="Club XYZ"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-brand-cream/80 mb-1">Date *</label>
-                <input
-                  type="date"
-                  value={formData.event_date}
-                  onChange={(e) => handleFieldChange('event_date', e.target.value)}
-                  className={`input-field ${formErrors.event_date ? 'border-red-500' : ''}`}
-                />
-                {formErrors.event_date && <p className="text-red-400 text-xs mt-1">{formErrors.event_date}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-brand-cream/80 mb-1">Time</label>
-                <input
-                  type="time"
-                  value={formData.event_time}
-                  onChange={(e) => handleFieldChange('event_time', e.target.value)}
-                  className="input-field"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-brand-cream/80 mb-1">Event Type</label>
-                <select
-                  value={formData.event_type}
-                  onChange={(e) => handleFieldChange('event_type', e.target.value)}
-                  className="input-field"
-                >
-                  {EVENT_TYPES.map(type => (
-                    <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-brand-cream/80 mb-1">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => handleFieldChange('status', e.target.value)}
-                  className="input-field"
-                >
-                  {EVENT_STATUS.map(status => (
-                    <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-brand-cream/80 mb-1">Main Artist</label>
-                <input
-                  type="text"
-                  value={formData.main_artist}
-                  onChange={(e) => handleFieldChange('main_artist', e.target.value)}
-                  className="input-field"
-                  placeholder="DJ Name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-brand-cream/80 mb-1">Minimum Age</label>
-                <input
-                  type="number"
-                  value={formData.min_age}
-                  onChange={(e) => handleFieldChange('min_age', e.target.value)}
-                  className="input-field"
-                  min="0"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-brand-cream/80 mb-1">Image URL</label>
-                <input
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => handleFieldChange('image_url', e.target.value)}
-                  className="input-field"
-                  placeholder="https://..."
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-brand-cream/80 mb-1">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => handleFieldChange('description', e.target.value)}
-                  className="input-field h-24 resize-none"
-                  placeholder="Event description..."
-                />
-              </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-brand-cream/80 mb-1">Event Name *</label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => handleFieldChange('name', e.target.value)}
+                className={`input-field ${formErrors.name ? 'border-red-500' : ''}`}
+                placeholder="NYE 2026 Party"
+              />
+              {formErrors.name && <p className="text-red-400 text-xs mt-1">{formErrors.name}</p>}
             </div>
 
-            {/* Ticket Tiers */}
-            <div className="border-t border-brand-gold/10 pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-lg font-semibold text-white">Ticket Tiers</h4>
-                <button type="button" onClick={addTier} className="btn-secondary py-1.5 px-3 text-sm">
-                  + Add Tier
-                </button>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-brand-cream/80 mb-1">Location *</label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) => handleFieldChange('location', e.target.value)}
+                className={`input-field ${formErrors.location ? 'border-red-500' : ''}`}
+                placeholder="Guatemala City, Guatemala"
+              />
+              {formErrors.location && <p className="text-red-400 text-xs mt-1">{formErrors.location}</p>}
+            </div>
 
-              <div className="space-y-4">
-                {formData.tiers.map((tier, index) => (
-                  <div key={index} className="p-4 bg-brand-green-dark/50 rounded-lg border border-brand-gold/10">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium text-brand-gold">Tier {index + 1}</span>
-                      {formData.tiers.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeTier(index)}
-                          className="text-red-400 hover:text-red-300 text-sm"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
+            <div>
+              <label className="block text-sm font-medium text-brand-cream/80 mb-1">Venue</label>
+              <input
+                type="text"
+                value={formData.venue}
+                onChange={(e) => handleFieldChange('venue', e.target.value)}
+                className="input-field"
+                placeholder="Club XYZ"
+              />
+            </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="col-span-2">
-                        <input
-                          type="text"
-                          value={tier.name}
-                          onChange={(e) => handleTierChange(index, 'name', e.target.value)}
-                          className={`input-field py-2 text-sm ${formErrors[`tier_${index}_name`] ? 'border-red-500' : ''}`}
-                          placeholder="Tier name (e.g., General)"
-                        />
-                      </div>
-                      <div>
-                        <input
-                          type="number"
-                          value={tier.price}
-                          onChange={(e) => handleTierChange(index, 'price', e.target.value)}
-                          className={`input-field py-2 text-sm ${formErrors[`tier_${index}_price`] ? 'border-red-500' : ''}`}
-                          placeholder="Price"
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
-                      <div>
-                        <input
-                          type="number"
-                          value={tier.quantity}
-                          onChange={(e) => handleTierChange(index, 'quantity', e.target.value)}
-                          className={`input-field py-2 text-sm ${formErrors[`tier_${index}_quantity`] ? 'border-red-500' : ''}`}
-                          placeholder="Quantity"
-                          min="0"
-                        />
-                      </div>
-                    </div>
-                    
-                    {tier.sold > 0 && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        {tier.sold} sold of {tier.quantity}
-                      </p>
+            <div>
+              <label className="block text-sm font-medium text-brand-cream/80 mb-1">Date *</label>
+              <input
+                type="date"
+                value={formData.event_date}
+                onChange={(e) => handleFieldChange('event_date', e.target.value)}
+                className={`input-field ${formErrors.event_date ? 'border-red-500' : ''}`}
+              />
+              {formErrors.event_date && <p className="text-red-400 text-xs mt-1">{formErrors.event_date}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-brand-cream/80 mb-1">Time</label>
+              <input
+                type="time"
+                value={formData.event_time}
+                onChange={(e) => handleFieldChange('event_time', e.target.value)}
+                className="input-field"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-brand-cream/80 mb-1">Event Type</label>
+              <select
+                value={formData.event_type}
+                onChange={(e) => handleFieldChange('event_type', e.target.value)}
+                className="input-field"
+              >
+                {EVENT_TYPES.map(type => (
+                  <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-brand-cream/80 mb-1">Status</label>
+              <select
+                value={formData.status}
+                onChange={(e) => handleFieldChange('status', e.target.value)}
+                className="input-field"
+              >
+                {EVENT_STATUS.map(status => (
+                  <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-brand-cream/80 mb-1">Main Artist</label>
+              <input
+                type="text"
+                value={formData.main_artist}
+                onChange={(e) => handleFieldChange('main_artist', e.target.value)}
+                className="input-field"
+                placeholder="DJ Name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-brand-cream/80 mb-1">Minimum Age</label>
+              <input
+                type="number"
+                value={formData.min_age}
+                onChange={(e) => handleFieldChange('min_age', e.target.value)}
+                className="input-field"
+                min="0"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-brand-cream/80 mb-1">Image URL</label>
+              <input
+                type="url"
+                value={formData.image_url}
+                onChange={(e) => handleFieldChange('image_url', e.target.value)}
+                className="input-field"
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-brand-cream/80 mb-1">Description</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => handleFieldChange('description', e.target.value)}
+                className="input-field h-24 resize-none"
+                placeholder="Event description..."
+              />
+            </div>
+          </div>
+
+          {/* Ticket Tiers */}
+          <div className="border-t border-brand-gold/10 pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-white">Ticket Tiers</h4>
+              <button type="button" onClick={addTier} className="btn-secondary py-1.5 px-3 text-sm">
+                + Add Tier
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {formData.tiers.map((tier, index) => (
+                <div key={index} className="p-4 bg-brand-green-dark/50 rounded-lg border border-brand-gold/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-brand-gold">Tier {index + 1}</span>
+                    {formData.tiers.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeTier(index)}
+                        className="text-red-400 hover:text-red-300 text-sm"
+                      >
+                        Remove
+                      </button>
                     )}
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Form Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t border-brand-gold/10 sticky bottom-0 bg-brand-green-dark">
-              <button
-                type="button"
-                onClick={() => setShowEventModal(false)}
-                className="btn-secondary"
-                disabled={isSaving}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="btn-gold" disabled={isSaving}>
-                {isSaving ? (
-                  <>
-                    <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="col-span-2">
+                      <input
+                        type="text"
+                        value={tier.name}
+                        onChange={(e) => handleTierChange(index, 'name', e.target.value)}
+                        className={`input-field py-2 text-sm ${formErrors[`tier_${index}_name`] ? 'border-red-500' : ''}`}
+                        placeholder="Tier name (e.g., General)"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        value={tier.price}
+                        onChange={(e) => handleTierChange(index, 'price', e.target.value)}
+                        className={`input-field py-2 text-sm ${formErrors[`tier_${index}_price`] ? 'border-red-500' : ''}`}
+                        placeholder="Price"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        value={tier.quantity}
+                        onChange={(e) => handleTierChange(index, 'quantity', e.target.value)}
+                        className={`input-field py-2 text-sm ${formErrors[`tier_${index}_quantity`] ? 'border-red-500' : ''}`}
+                        placeholder="Quantity"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+                  
+                  {tier.sold > 0 && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      {tier.sold} sold of {tier.quantity}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Form Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-brand-gold/10">
+            <button
+              type="button"
+              onClick={() => setShowEventModal(false)}
+              className="btn-secondary"
+              disabled={isSaving}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="btn-gold" disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Saving...
+                </>
+              ) : (
+                editingEvent ? 'Update Event' : 'Create Event'
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Delete Event"
+        size="sm"
+      >
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+            <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h4 className="text-lg font-semibold text-white mb-2">Delete "{editingEvent?.name}"?</h4>
+          <p className="text-gray-400 text-sm mb-6">
+            This action cannot be undone. All tickets and orders associated with this event will be affected.
+          </p>
+          <div className="flex justify-center gap-3">
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="btn-secondary"
+              disabled={isSaving}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteConfirm}
+              className="btn-danger"
+              disabled={isSaving}
+            >
+              {isSaving ? 'Deleting...' : 'Delete Event'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+export default Events;

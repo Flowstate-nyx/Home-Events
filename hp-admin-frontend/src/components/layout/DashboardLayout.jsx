@@ -34,7 +34,7 @@ function DashboardLayout() {
       />
 
       {/* Main content area */}
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-0">
+      <div className="flex-1 flex flex-col h-screen lg:ml-0">
         {/* Header */}
         <Header
           onMenuClick={() => setSidebarOpen(true)}
@@ -42,7 +42,7 @@ function DashboardLayout() {
         />
 
         {/* Page content */}
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
+        <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
           <Outlet />
         </main>
       </div>

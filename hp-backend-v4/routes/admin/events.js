@@ -177,14 +177,14 @@ router.put('/:id', async (req, res, next) => {
         `UPDATE events SET
           name = COALESCE($1, name),
           location = COALESCE($2, location),
-          venue = $3,
+          venue = COALESCE($3, venue),
           event_date = COALESCE($4, event_date),
           event_time = COALESCE($5, event_time),
           description = COALESCE($6, description),
           event_type = COALESCE($7, event_type),
-          main_artist = $8,
+          main_artist = COALESCE($8, main_artist),
           artists = COALESCE($9, artists),
-          image_url = $10,
+          image_url = COALESCE($10, image_url),
           status = COALESCE($11, status),
           min_age = COALESCE($12, min_age),
           is_featured = COALESCE($13, is_featured)

@@ -218,6 +218,7 @@ function Events() {
     try {
       const payload = {
         ...formData,
+        date: formData.event_date,
         min_age: parseInt(formData.min_age) || 18,
         tiers: formData.tiers.map(t => ({
           ...t,

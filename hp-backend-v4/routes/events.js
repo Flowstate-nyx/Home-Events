@@ -17,7 +17,7 @@ function formatEvent(event) {
     slug: event.slug,
     location: event.location,
     venue: event.venue,
-    date: event.event_date,
+    date: event.date,
     time: event.event_time,
     description: event.description,
     type: event.event_type,

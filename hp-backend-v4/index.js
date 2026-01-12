@@ -59,7 +59,10 @@ app.use(helmet({
 
 // CORS
 app.use(cors({
-  origin: config.corsOrigin === '*' ? true : config.corsOrigin,
+  origin: [
+  'https://admin.homeproductions.art',
+  'https://homeproductions.art'
+],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']

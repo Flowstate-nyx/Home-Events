@@ -1,8 +1,3 @@
-/**
- * Events Page
- * Full event management with tier editing
- */
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth.js';
 import { fetchEvents, createEvent, updateEvent, deleteEvent } from '../services/events.service.js';
@@ -10,11 +5,9 @@ import StatusBadge from '../components/common/StatusBadge.jsx';
 import Modal from '../components/common/Modal.jsx';
 import { formatDate, formatTime, formatCurrency } from '../utils/formatters.js';
 
-// Status options
 const EVENT_STATUS = ['draft', 'active', 'cancelled', 'completed'];
 const EVENT_TYPES = ['party', 'festival', 'gathering', 'concert', 'workshop'];
 
-// Empty tier template
 const emptyTier = {
   name: '',
   description: '',
@@ -23,9 +16,9 @@ const emptyTier = {
   quantity: '',
   max_per_order: 10,
   is_active: true,
+  paymentLink: '',
 };
 
-// Empty event template
 const emptyEvent = {
   name: '',
   location: '',
@@ -44,16 +37,13 @@ const emptyEvent = {
 function Events() {
   const { accessToken } = useAuth();
 
-  // Data state
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filter state
   const [statusFilter, setStatusFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Modal state
   const [showEventModal, setShowEventModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
@@ -62,7 +52,6 @@ function Events() {
   const [isSaving, setIsSaving] = useState(false);
   const [actionMessage, setActionMessage] = useState(null);
 
-  // Fetch events
   const loadEvents = useCallback(async () => {
     if (!accessToken) return;
 
@@ -89,7 +78,6 @@ function Events() {
     loadEvents();
   }, [loadEvents]);
 
-  // Open create modal
   const handleCreate = () => {
     setEditingEvent(null);
     setFormData({ ...emptyEvent, tiers: [{ ...emptyTier }] });
@@ -97,7 +85,6 @@ function Events() {
     setShowEventModal(true);
   };
 
-  // Open edit modal
   const handleEdit = (event) => {
     setEditingEvent(event);
     setFormData({
@@ -122,19 +109,18 @@ function Events() {
         sold: t.sold || 0,
         max_per_order: t.max_per_order || 10,
         is_active: t.is_active !== false,
+        paymentLink: t.payment_link || '',
       })) : [{ ...emptyTier }],
     });
     setFormErrors({});
     setShowEventModal(true);
   };
 
-  // Open delete confirmation
   const handleDeleteClick = (event) => {
     setEditingEvent(event);
     setShowDeleteModal(true);
   };
 
-  // Confirm delete
   const handleDeleteConfirm = async () => {
     if (!editingEvent) return;
 
@@ -152,7 +138,6 @@ function Events() {
     }
   };
 
-  // Form field change
   const handleFieldChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     if (formErrors[field]) {
@@ -160,7 +145,6 @@ function Events() {
     }
   };
 
-  // Tier field change
   const handleTierChange = (index, field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -170,7 +154,6 @@ function Events() {
     }));
   };
 
-  // Add tier
   const addTier = () => {
     setFormData(prev => ({
       ...prev,
@@ -178,7 +161,6 @@ function Events() {
     }));
   };
 
-  // Remove tier
   const removeTier = (index) => {
     if (formData.tiers.length <= 1) return;
     setFormData(prev => ({
@@ -187,7 +169,6 @@ function Events() {
     }));
   };
 
-  // Validate form
   const validateForm = () => {
     const errors = {};
 
@@ -195,7 +176,6 @@ function Events() {
     if (!formData.location.trim()) errors.location = 'Location is required';
     if (!formData.event_date) errors.event_date = 'Event date is required';
 
-    // Validate tiers
     formData.tiers.forEach((tier, index) => {
       if (!tier.name.trim()) errors[`tier_${index}_name`] = 'Tier name required';
       if (!tier.price && tier.price !== 0) errors[`tier_${index}_price`] = 'Price required';
@@ -206,7 +186,6 @@ function Events() {
     return Object.keys(errors).length === 0;
   };
 
-  // Submit form
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -225,6 +204,7 @@ function Events() {
           price: parseFloat(t.price) || 0,
           quantity: parseInt(t.quantity) || 0,
           max_per_order: parseInt(t.max_per_order) || 10,
+          paymentLink: t.paymentLink || '',
         })),
       };
 
@@ -245,7 +225,6 @@ function Events() {
     }
   };
 
-  // Calculate inventory for an event
   const getInventory = (event) => {
     const tiers = event.tiers || event.ticket_tiers || [];
     const total = tiers.reduce((sum, t) => sum + (t.quantity || 0), 0);
@@ -255,7 +234,6 @@ function Events() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-white">Events</h2>
@@ -269,7 +247,6 @@ function Events() {
         </button>
       </div>
 
-      {/* Action message */}
       {actionMessage && (
         <div className={`p-4 rounded-lg animate-fade-in ${
           actionMessage.type === 'success' 
@@ -287,7 +264,6 @@ function Events() {
         </div>
       )}
 
-      {/* Filters */}
       <div className="card p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
@@ -314,7 +290,6 @@ function Events() {
         </div>
       </div>
 
-      {/* Events List */}
       <div className="space-y-4">
         {isLoading ? (
           <div className="card p-12 text-center">
@@ -345,10 +320,9 @@ function Events() {
             return (
               <div key={event.id} className="card p-6 hover:border-brand-gold/30 transition-colors">
                 <div className="flex flex-col lg:flex-row gap-6">
-                  {/* Event image */}
                   <div className="lg:w-48 h-32 lg:h-auto rounded-lg bg-brand-green-dark overflow-hidden flex-shrink-0">
-                    {event.image_url ? (
-                      <img src={event.image_url} alt={event.name} className="w-full h-full object-cover" />
+                    {event.image ? (
+                      <img src={event.image} alt={event.name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-600">
                         <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -358,7 +332,6 @@ function Events() {
                     )}
                   </div>
 
-                  {/* Event info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-4 mb-3">
                       <div>
@@ -389,7 +362,6 @@ function Events() {
                       {event.venue ? `${event.venue}, ${event.location}` : event.location}
                     </p>
 
-                    {/* Inventory & Tiers */}
                     <div className="flex flex-wrap items-center gap-4 text-sm">
                       <div className="flex items-center gap-2">
                         <span className="text-gray-500">Tickets:</span>
@@ -409,7 +381,6 @@ function Events() {
                     </div>
                   </div>
 
-                  {/* Actions */}
                   <div className="flex lg:flex-col gap-2 lg:w-auto">
                     <button
                       onClick={() => handleEdit(event)}
@@ -437,7 +408,6 @@ function Events() {
         )}
       </div>
 
-      {/* Event Form Modal */}
       <Modal
         isOpen={showEventModal}
         onClose={() => setShowEventModal(false)}
@@ -446,7 +416,6 @@ function Events() {
       >
         <div className="max-h-[calc(100vh-12rem)] overflow-y-auto">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Basic Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-brand-cream/80 mb-1">Event Name *</label>
@@ -574,7 +543,6 @@ function Events() {
               </div>
             </div>
 
-            {/* Ticket Tiers */}
             <div className="border-t border-brand-gold/10 pt-6">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-lg font-semibold text-white">Ticket Tiers</h4>
@@ -599,7 +567,7 @@ function Events() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                       <div className="col-span-2">
                         <input
                           type="text"
@@ -632,6 +600,16 @@ function Events() {
                       </div>
                     </div>
                     
+                    <div className="col-span-full">
+                      <input
+                        type="url"
+                        value={tier.paymentLink}
+                        onChange={(e) => handleTierChange(index, 'paymentLink', e.target.value)}
+                        className="input-field py-2 text-sm w-full"
+                        placeholder="Payment Link (Recurrente) - https://..."
+                      />
+                    </div>
+                    
                     {tier.sold > 0 && (
                       <p className="text-xs text-gray-500 mt-2">
                         {tier.sold} sold of {tier.quantity}
@@ -642,7 +620,6 @@ function Events() {
               </div>
             </div>
 
-            {/* Form Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-brand-gold/10">
               <button
                 type="button"
@@ -670,7 +647,6 @@ function Events() {
         </div>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
       <Modal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}

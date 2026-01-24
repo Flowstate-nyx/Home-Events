@@ -85,11 +85,11 @@ router.get('/', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const {
-      name, location, venue, event_date, event_time, description, event_type,
-      main_artist, artists, image_url, status, min_age, tiers
+      name, location, venue, date, time, description, type,
+      mainArtist, artists, image, status, minAge, tiers
     } = req.body;
     
-    if (!name || !location || !event_date) {
+    if (!name || !location || !date) {
       return res.status(400).json({
         success: false,
         error: 'Name, location, and date are required',
@@ -105,9 +105,9 @@ router.post('/', async (req, res, next) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          RETURNING *`,
         [
-          name, location, venue || null, event_date, event_time || '21:00', description || '',
-          event_type || 'party', main_artist || null, artists || [], image_url || null,
-          status || 'draft', min_age || 18, req.user.id
+          name, location, venue || null, date, time || '21:00', description || '',
+          type || 'party', mainArtist || null, artists || [], image || null,
+          status || 'draft', minAge || 18, req.user.id
         ]
       );
       
@@ -131,7 +131,7 @@ router.post('/', async (req, res, next) => {
       return event;
     });
     
-    await auditService.logEventCreate(event.id, req.user.id, { name, location, date: event_date });
+    await auditService.logEventCreate(event.id, req.user.id, { name, location, date });
     
     logger.info('Event created', { eventId: event.id, name, userId: req.user.id });
     
@@ -153,8 +153,8 @@ router.put('/:id', async (req, res, next) => {
   try {
     const eventId = req.params.id;
     const {
-      name, location, venue, event_date, event_time, description, event_type,
-      main_artist, artists, image_url, status, min_age, isFeatured, tiers
+      name, location, venue, date, time, description, type,
+      mainArtist, artists, image, status, minAge, isFeatured, tiers
     } = req.body;
     
     // Get existing event
@@ -177,21 +177,21 @@ router.put('/:id', async (req, res, next) => {
         `UPDATE events SET
           name = COALESCE($1, name),
           location = COALESCE($2, location),
-          venue = COALESCE($3, venue),
+          venue = $3,
           event_date = COALESCE($4, event_date),
           event_time = COALESCE($5, event_time),
           description = COALESCE($6, description),
           event_type = COALESCE($7, event_type),
-          main_artist = COALESCE($8, main_artist),
+          main_artist = $8,
           artists = COALESCE($9, artists),
-          image_url = COALESCE($10, image_url),
+          image_url = $10,
           status = COALESCE($11, status),
           min_age = COALESCE($12, min_age),
           is_featured = COALESCE($13, is_featured)
          WHERE id = $14`,
         [
-          name, location, venue, event_date, event_time, description, event_type,
-          main_artist, artists, image_url, status, min_age, isFeatured, eventId
+          name, location, venue, date, time, description, type,
+          mainArtist, artists, image, status, minAge, isFeatured, eventId
         ]
       );
       

@@ -59,6 +59,104 @@ router.get('/', async (req, res, next) => {
 });
 
 /**
+ * POST /api/admin/orders/test
+ * Create test order (paid immediately)
+ */
+router.post('/test', async (req, res, next) => {
+  try {
+    const { 
+      event_id, 
+      tier_id, 
+      buyer_name, 
+      buyer_email, 
+      buyer_phone,
+      quantity = 1,
+      send_email = true 
+    } = req.body;
+    
+    // Validate required fields
+    if (!event_id || !tier_id || !buyer_name || !buyer_email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: event_id, tier_id, buyer_name, buyer_email'
+      });
+    }
+    
+    // Create order
+    const order = await orderService.createOrder({
+      eventId: event_id,
+      tierId: tier_id,
+      buyerName: buyer_name,
+      buyerEmail: buyer_email,
+      buyerPhone: buyer_phone,
+      quantity: parseInt(quantity) || 1,
+      paymentMethod: 'test',
+      referralSource: 'admin_test'
+    });
+    
+    // Immediately confirm payment
+    const paymentResult = await orderService.confirmPayment(order.id, {
+      provider: 'test',
+      reference: `TEST-${Date.now()}`
+    }, req.user);
+    
+    // Send email if requested
+    let emailSent = false;
+    if (send_email && !paymentResult.alreadyPaid) {
+      const emailResult = await emailService.processPendingEmails(db, 1);
+      emailSent = emailResult.sent > 0;
+    }
+    
+    await auditService.logOrderStatusChange(order.id, req.user.id, 'pending', 'paid');
+    
+    logger.info('Test order created', { 
+      orderId: order.id, 
+      orderNumber: order.order_number,
+      userId: req.user.id,
+      emailSent
+    });
+    
+    res.json({
+      success: true,
+      message: 'Test order created',
+      order: {
+        id: order.id,
+        orderNumber: order.order_number,
+        eventName: order.event_name,
+        tierName: order.tier_name,
+        buyerName: order.buyer_name,
+        buyerEmail: order.buyer_email,
+        quantity: order.quantity,
+        totalPrice: parseFloat(order.total_price),
+        status: 'paid',
+        qrCode: order.qr_plaintext
+      },
+      emailSent
+    });
+  } catch (err) {
+    if (err.message === 'TIER_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        error: 'Event or tier not found'
+      });
+    }
+    if (err.message === 'INSUFFICIENT_INVENTORY') {
+      return res.status(400).json({
+        success: false,
+        error: 'Not enough tickets available'
+      });
+    }
+    if (err.message === 'EVENT_NOT_ACTIVE') {
+      return res.status(400).json({
+        success: false,
+        error: 'Event is not active'
+      });
+    }
+    next(err);
+  }
+});
+
+/**
  * PUT /api/admin/orders/:id/status
  * Update order status
  */
@@ -227,6 +325,45 @@ router.post('/mark-paid', async (req, res, next) => {
       message: result.alreadyPaid ? 'Already paid' : 'Payment confirmed',
       emailSent,
       order_id: order.order_number
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/admin/checkins
+ * Get recent check-ins
+ */
+router.get('/checkins', async (req, res, next) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    
+    const checkins = await db.queryAll(
+      `SELECT c.*, 
+              o.order_number, o.buyer_name, o.buyer_email, o.quantity,
+              e.name as event_name, t.name as tier_name
+       FROM checkins c
+       JOIN orders o ON o.id = c.order_id
+       JOIN events e ON e.id = o.event_id
+       JOIN ticket_tiers t ON t.id = o.tier_id
+       ORDER BY c.checked_in_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    
+    res.json({
+      success: true,
+      checkins: checkins.map(c => ({
+        id: c.id,
+        orderNumber: c.order_number,
+        buyerName: c.buyer_name,
+        buyerEmail: c.buyer_email,
+        quantity: c.quantity,
+        eventName: c.event_name,
+        tierName: c.tier_name,
+        checkedInAt: c.checked_in_at
+      }))
     });
   } catch (err) {
     next(err);

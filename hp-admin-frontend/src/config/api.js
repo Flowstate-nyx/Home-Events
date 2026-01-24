@@ -33,6 +33,7 @@ export const ENDPOINTS = {
     GET: (id) => `/api/admin/orders/${id}`,
     UPDATE_STATUS: (id) => `/api/admin/orders/${id}/status`,
     RESEND_EMAIL: (id) => `/api/admin/orders/${id}/resend-email`,
+    CREATE_TEST: '/api/admin/orders/test',
   },
 
   // Check-in

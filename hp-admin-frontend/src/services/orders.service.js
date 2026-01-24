@@ -95,3 +95,25 @@ export async function resendOrderEmail(accessToken, orderId) {
 
   return data;
 }
+
+/**
+ * Create a test order
+ */
+export async function createTestOrder(accessToken, orderData) {
+  const response = await fetch(`${API_BASE_URL}${ENDPOINTS.ORDERS.CREATE_TEST}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(orderData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || data.error || 'Failed to create test order');
+  }
+
+  return data;
+}

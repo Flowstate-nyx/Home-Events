@@ -5,7 +5,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth.js';
-import { fetchOrders, updateOrderStatus, resendOrderEmail } from '../services/orders.service.js';
+import { fetchOrders, updateOrderStatus, resendOrderEmail, createTestOrder } from '../services/orders.service.js';
+import { fetchEvents, fetchEvent } from '../services/events.service.js';
 import StatusBadge from '../components/common/StatusBadge.jsx';
 import Modal from '../components/common/Modal.jsx';
 import { formatDateTime, formatCurrency, truncate } from '../utils/formatters.js';
@@ -37,6 +38,23 @@ function Orders() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [actionMessage, setActionMessage] = useState(null);
+
+  // Test order modal state
+  const [showTestOrderModal, setShowTestOrderModal] = useState(false);
+  const [events, setEvents] = useState([]);
+  const [tiers, setTiers] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [tiersLoading, setTiersLoading] = useState(false);
+  const [testOrderLoading, setTestOrderLoading] = useState(false);
+  const [testOrderForm, setTestOrderForm] = useState({
+    event_id: '',
+    tier_id: '',
+    buyer_name: '',
+    buyer_email: '',
+    buyer_phone: '',
+    quantity: 1,
+    send_email: false,
+  });
 
   // Fetch orders
   const loadOrders = useCallback(async () => {
@@ -122,6 +140,86 @@ function Orders() {
     setShowDetailsModal(true);
   };
 
+  // Open test order modal and load events
+  const openTestOrderModal = async () => {
+    setShowTestOrderModal(true);
+    setEventsLoading(true);
+    try {
+      const data = await fetchEvents(accessToken);
+      const eventsList = data.events || data.data || data || [];
+      setEvents(Array.isArray(eventsList) ? eventsList : []);
+    } catch (err) {
+      setActionMessage({ type: 'error', text: 'Failed to load events: ' + err.message });
+    } finally {
+      setEventsLoading(false);
+    }
+  };
+
+  // Close test order modal and reset form
+  const closeTestOrderModal = () => {
+    setShowTestOrderModal(false);
+    setTestOrderForm({
+      event_id: '',
+      tier_id: '',
+      buyer_name: '',
+      buyer_email: '',
+      buyer_phone: '',
+      quantity: 1,
+      send_email: false,
+    });
+    setTiers([]);
+  };
+
+  // Handle event selection - load tiers
+  const handleEventChange = async (eventId) => {
+    setTestOrderForm(prev => ({ ...prev, event_id: eventId, tier_id: '' }));
+    setTiers([]);
+
+    if (!eventId) return;
+
+    setTiersLoading(true);
+    try {
+      const eventData = await fetchEvent(accessToken, eventId);
+      const event = eventData.event || eventData;
+      const tiersList = event.tiers || [];
+      setTiers(tiersList);
+    } catch (err) {
+      setActionMessage({ type: 'error', text: 'Failed to load tiers: ' + err.message });
+    } finally {
+      setTiersLoading(false);
+    }
+  };
+
+  // Handle test order form field change
+  const handleTestOrderFieldChange = (field, value) => {
+    setTestOrderForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Submit test order
+  const handleTestOrderSubmit = async (e) => {
+    e.preventDefault();
+    setTestOrderLoading(true);
+
+    try {
+      await createTestOrder(accessToken, {
+        event_id: testOrderForm.event_id,
+        tier_id: testOrderForm.tier_id,
+        buyer_name: testOrderForm.buyer_name,
+        buyer_email: testOrderForm.buyer_email,
+        buyer_phone: testOrderForm.buyer_phone,
+        quantity: parseInt(testOrderForm.quantity, 10),
+        send_email: testOrderForm.send_email,
+      });
+      setActionMessage({ type: 'success', text: 'Test order created successfully' });
+      closeTestOrderModal();
+      loadOrders();
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err.message });
+    } finally {
+      setTestOrderLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -132,6 +230,12 @@ function Orders() {
             {totalOrders} total orders
           </p>
         </div>
+        <button onClick={openTestOrderModal} className="btn-gold">
+          <svg className="w-5 h-5 mr-2 -ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Create Test Order
+        </button>
       </div>
 
       {/* Action message */}
@@ -482,6 +586,143 @@ function Orders() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Create Test Order Modal */}
+      <Modal
+        isOpen={showTestOrderModal}
+        onClose={closeTestOrderModal}
+        title="Create Test Order"
+        size="md"
+      >
+        <form onSubmit={handleTestOrderSubmit} className="space-y-4">
+          {/* Event dropdown */}
+          <div>
+            <label className="block text-sm font-medium text-brand-cream/80 mb-1">Event *</label>
+            <select
+              value={testOrderForm.event_id}
+              onChange={(e) => handleEventChange(e.target.value)}
+              className="input-field"
+              required
+              disabled={eventsLoading}
+            >
+              <option value="">
+                {eventsLoading ? 'Loading events...' : 'Select an event'}
+              </option>
+              {events.map((event) => (
+                <option key={event.id} value={event.id}>
+                  {event.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Tier dropdown */}
+          <div>
+            <label className="block text-sm font-medium text-brand-cream/80 mb-1">Tier *</label>
+            <select
+              value={testOrderForm.tier_id}
+              onChange={(e) => handleTestOrderFieldChange('tier_id', e.target.value)}
+              className="input-field"
+              required
+              disabled={!testOrderForm.event_id || tiersLoading}
+            >
+              <option value="">
+                {tiersLoading ? 'Loading tiers...' : !testOrderForm.event_id ? 'Select an event first' : 'Select a tier'}
+              </option>
+              {tiers.map((tier) => (
+                <option key={tier.id} value={tier.id}>
+                  {tier.name} - {formatCurrency(tier.price, tier.currency)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Buyer name */}
+          <div>
+            <label className="block text-sm font-medium text-brand-cream/80 mb-1">Buyer Name *</label>
+            <input
+              type="text"
+              value={testOrderForm.buyer_name}
+              onChange={(e) => handleTestOrderFieldChange('buyer_name', e.target.value)}
+              className="input-field"
+              placeholder="John Doe"
+              required
+            />
+          </div>
+
+          {/* Buyer email */}
+          <div>
+            <label className="block text-sm font-medium text-brand-cream/80 mb-1">Buyer Email *</label>
+            <input
+              type="email"
+              value={testOrderForm.buyer_email}
+              onChange={(e) => handleTestOrderFieldChange('buyer_email', e.target.value)}
+              className="input-field"
+              placeholder="john@example.com"
+              required
+            />
+          </div>
+
+          {/* Buyer phone */}
+          <div>
+            <label className="block text-sm font-medium text-brand-cream/80 mb-1">Buyer Phone</label>
+            <input
+              type="tel"
+              value={testOrderForm.buyer_phone}
+              onChange={(e) => handleTestOrderFieldChange('buyer_phone', e.target.value)}
+              className="input-field"
+              placeholder="+1 234 567 8900"
+            />
+          </div>
+
+          {/* Quantity */}
+          <div>
+            <label className="block text-sm font-medium text-brand-cream/80 mb-1">Quantity *</label>
+            <input
+              type="number"
+              value={testOrderForm.quantity}
+              onChange={(e) => handleTestOrderFieldChange('quantity', e.target.value)}
+              className="input-field"
+              min="1"
+              max="10"
+              required
+            />
+          </div>
+
+          {/* Send email checkbox */}
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="send_email"
+              checked={testOrderForm.send_email}
+              onChange={(e) => handleTestOrderFieldChange('send_email', e.target.checked)}
+              className="w-4 h-4 rounded border-brand-gold/30 bg-brand-green-light text-brand-gold focus:ring-brand-gold/50"
+            />
+            <label htmlFor="send_email" className="text-sm text-brand-cream/80">
+              Send confirmation email to buyer
+            </label>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4 border-t border-brand-gold/10">
+            <button
+              type="submit"
+              className="btn-gold flex-1"
+              disabled={testOrderLoading}
+            >
+              {testOrderLoading ? 'Creating...' : 'Create Test Order'}
+            </button>
+            <button
+              type="button"
+              onClick={closeTestOrderModal}
+              className="btn-secondary"
+              disabled={testOrderLoading}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

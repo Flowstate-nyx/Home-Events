@@ -1,5 +1,16 @@
 /**
- * Admin Order Routes
+ * Admin Order Routes v2.0
+ * Isolated test orders + multi-tenant support
+ * 
+ * TASK 5 & 6: Test Order Isolation
+ * - No event/tier selection for test orders
+ * - System test event/tier auto-created
+ * - is_test = true for all test orders
+ * - Test orders excluded from stats by default
+ * 
+ * BACKWARDS COMPATIBILITY:
+ * - All existing endpoints preserved
+ * - Default behavior excludes test orders
  */
 
 import express from 'express';
@@ -11,17 +22,26 @@ import logger from '../../utils/logger.js';
 
 const router = express.Router();
 
+// ============================================
+// LIST ORDERS
+// ============================================
+
 /**
  * GET /api/admin/orders
- * List orders
+ * List orders (excludes test orders by default)
  */
 router.get('/', async (req, res, next) => {
   try {
-    const { eventId, status, limit, offset } = req.query;
+    const { eventId, status, clientId, includeTest, limit, offset } = req.query;
+    
+    // User's client scope (if not platform admin)
+    const userClientId = req.user.client_id || clientId;
     
     const orders = await orderService.listOrders({
       eventId,
       status,
+      clientId: userClientId,
+      includeTest: includeTest === 'true', // Default: exclude test orders
       limit: parseInt(limit) || 100,
       offset: parseInt(offset) || 0
     });
@@ -40,10 +60,13 @@ router.get('/', async (req, res, next) => {
         buyerPhone: order.buyer_phone,
         quantity: order.quantity,
         totalPrice: parseFloat(order.total_price),
+        platformFee: parseFloat(order.platform_fee_amount || 0),
+        clientRevenue: parseFloat(order.client_revenue || order.total_price),
         status: order.status,
         paymentMethod: order.payment_method,
         emailStatus: emailStatus?.status || null,
         emailSentAt: emailStatus?.sent_at || null,
+        isTest: order.is_test || false,
         createdAt: order.created_at
       };
     }));
@@ -58,56 +81,68 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// ============================================
+// CREATE TEST ORDER (TASK 5 & 6)
+// ============================================
+
 /**
  * POST /api/admin/orders/test
- * Create test order (paid immediately)
+ * Create isolated test order
+ * 
+ * CRITICAL CHANGES FROM OLD VERSION:
+ * - NO event_id or tier_id required
+ * - Uses system test event/tier automatically
+ * - Creates with is_test = true
+ * - Amount = $0.00
+ * - Does NOT affect real inventory or stats
  */
 router.post('/test', async (req, res, next) => {
   try {
     const { 
-      event_id, 
-      tier_id, 
-      buyer_name, 
       buyer_email, 
+      buyer_name, 
       buyer_phone,
       quantity = 1,
       send_email = true 
     } = req.body;
     
-    // Validate required fields
-    if (!event_id || !tier_id || !buyer_name || !buyer_email) {
+    // Validate required field
+    if (!buyer_email) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: event_id, tier_id, buyer_name, buyer_email'
+        error: 'buyer_email is required'
       });
     }
     
-    // Create order
-    const order = await orderService.createOrder({
-      eventId: event_id,
-      tierId: tier_id,
-      buyerName: buyer_name,
-      buyerEmail: buyer_email,
-      buyerPhone: buyer_phone,
-      quantity: parseInt(quantity) || 1,
-      paymentMethod: 'test',
-      referralSource: 'admin_test'
-    });
-    
-    // Immediately confirm payment
-    const paymentResult = await orderService.confirmPayment(order.id, {
-      provider: 'test',
-      reference: `TEST-${Date.now()}`
-    }, req.user);
-    
-    // Send email if requested
-    let emailSent = false;
-    if (send_email && !paymentResult.alreadyPaid) {
-      const emailResult = await emailService.processPendingEmails(db, 1);
-      emailSent = emailResult.sent > 0;
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(buyer_email)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid email format'
+      });
     }
     
-    await auditService.logOrderStatusChange(order.id, req.user.id, 'pending', 'paid');
+    // Create isolated test order
+    const order = await orderService.createTestOrder({
+      buyerEmail: buyer_email,
+      buyerName: buyer_name || 'Test User',
+      buyerPhone: buyer_phone,
+      quantity: parseInt(quantity) || 1,
+      createdBy: req.user.id
+    });
+    
+    // Log audit
+    await auditService.logTestOrderCreated(order.id, req.user.id, order);
+    
+    // Send test email if requested
+    let emailSent = false;
+    if (send_email) {
+      emailSent = await emailService.sendTestTicketEmail(db, order);
+      if (emailSent) {
+        await auditService.logTestEmailSent(order.id, req.user.id, buyer_email);
+      }
+    }
     
     logger.info('Test order created', { 
       orderId: order.id, 
@@ -127,34 +162,27 @@ router.post('/test', async (req, res, next) => {
         buyerName: order.buyer_name,
         buyerEmail: order.buyer_email,
         quantity: order.quantity,
-        totalPrice: parseFloat(order.total_price),
+        totalPrice: 0.00, // Always $0 for test orders
         status: 'paid',
+        isTest: true,
         qrCode: order.qr_plaintext
       },
       emailSent
     });
   } catch (err) {
-    if (err.message === 'TIER_NOT_FOUND') {
-      return res.status(404).json({
-        success: false,
-        error: 'Event or tier not found'
-      });
-    }
-    if (err.message === 'INSUFFICIENT_INVENTORY') {
+    if (err.message === 'BUYER_EMAIL_REQUIRED') {
       return res.status(400).json({
         success: false,
-        error: 'Not enough tickets available'
-      });
-    }
-    if (err.message === 'EVENT_NOT_ACTIVE') {
-      return res.status(400).json({
-        success: false,
-        error: 'Event is not active'
+        error: 'Email address is required'
       });
     }
     next(err);
   }
 });
+
+// ============================================
+// UPDATE ORDER STATUS (EXISTING)
+// ============================================
 
 /**
  * PUT /api/admin/orders/:id/status
@@ -196,8 +224,8 @@ router.put('/:id/status', async (req, res, next) => {
           reference: paymentReference
         }, req.user);
         
-        // Process email if requested
-        if (sendEmail !== false && !result.alreadyPaid) {
+        // Process email if requested (skip for test orders)
+        if (sendEmail !== false && !result.alreadyPaid && !order.is_test) {
           const emailResult = await emailService.processPendingEmails(db, 1);
           emailSent = emailResult.sent > 0;
         }
@@ -209,6 +237,7 @@ router.put('/:id/status', async (req, res, next) => {
         
       case 'refunded':
         result = await orderService.refundOrder(orderId, null, req.user);
+        await auditService.logOrderRefund(orderId, req.user.id);
         break;
         
       default:
@@ -238,6 +267,10 @@ router.put('/:id/status', async (req, res, next) => {
   }
 });
 
+// ============================================
+// RESEND EMAIL
+// ============================================
+
 /**
  * POST /api/admin/orders/:id/resend-email
  * Resend ticket email
@@ -263,11 +296,13 @@ router.post('/:id/resend-email', async (req, res, next) => {
       });
     }
     
+    // forceResendTicket automatically handles test vs regular orders
     const result = await emailService.forceResendTicket(db, orderId);
     
     logger.info('Email resend triggered', { 
       orderId, 
       sent: result.sent,
+      isTest: order.is_test,
       userId: req.user.id 
     });
     
@@ -280,6 +315,10 @@ router.post('/:id/resend-email', async (req, res, next) => {
     next(err);
   }
 });
+
+// ============================================
+// LEGACY ENDPOINT (BACKWARDS COMPAT)
+// ============================================
 
 /**
  * POST /api/admin/mark-paid
@@ -315,7 +354,7 @@ router.post('/mark-paid', async (req, res, next) => {
     }, req.user);
     
     let emailSent = false;
-    if (!result.alreadyPaid) {
+    if (!result.alreadyPaid && !order.is_test) {
       const emailResult = await emailService.processPendingEmails(db, 1);
       emailSent = emailResult.sent > 0;
     }
@@ -331,26 +370,36 @@ router.post('/mark-paid', async (req, res, next) => {
   }
 });
 
+// ============================================
+// CHECK-INS (Exclude test by default)
+// ============================================
+
 /**
- * GET /api/admin/checkins
- * Get recent check-ins
+ * GET /api/admin/orders/checkins
+ * Get recent check-ins (excludes test by default)
  */
 router.get('/checkins', async (req, res, next) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
+    const includeTest = req.query.includeTest === 'true';
     
-    const checkins = await db.queryAll(
-      `SELECT c.*, 
-              o.order_number, o.buyer_name, o.buyer_email, o.quantity,
-              e.name as event_name, t.name as tier_name
-       FROM checkins c
-       JOIN orders o ON o.id = c.order_id
-       JOIN events e ON e.id = o.event_id
-       JOIN ticket_tiers t ON t.id = o.tier_id
-       ORDER BY c.checked_in_at DESC
-       LIMIT $1`,
-      [limit]
-    );
+    let sql = `
+      SELECT c.*, 
+             o.order_number, o.buyer_name, o.buyer_email, o.quantity, o.is_test,
+             e.name as event_name, t.name as tier_name
+      FROM checkins c
+      JOIN orders o ON o.id = c.order_id
+      JOIN events e ON e.id = o.event_id
+      JOIN ticket_tiers t ON t.id = o.tier_id
+    `;
+    
+    if (!includeTest) {
+      sql += ` WHERE o.is_test = false`;
+    }
+    
+    sql += ` ORDER BY c.checked_in_at DESC LIMIT $1`;
+    
+    const checkins = await db.queryAll(sql, [limit]);
     
     res.json({
       success: true,
@@ -362,9 +411,117 @@ router.get('/checkins', async (req, res, next) => {
         quantity: c.quantity,
         eventName: c.event_name,
         tierName: c.tier_name,
+        isTest: c.is_test || false,
         checkedInAt: c.checked_in_at
       }))
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ============================================
+// ORDER EXPORT (TASK 8)
+// ============================================
+
+/**
+ * GET /api/admin/orders/export
+ * Export orders as CSV
+ */
+router.get('/export', async (req, res, next) => {
+  try {
+    const { eventId, status, startDate, endDate, includeTest } = req.query;
+    
+    let sql = `
+      SELECT 
+        o.order_number,
+        o.created_at,
+        o.buyer_name,
+        o.buyer_email,
+        o.buyer_phone,
+        e.name as event_name,
+        e.event_date,
+        t.name as tier_name,
+        o.quantity,
+        o.unit_price,
+        o.total_price,
+        o.platform_fee_amount,
+        o.status,
+        o.payment_method,
+        o.payment_confirmed_at,
+        o.is_test
+      FROM orders o
+      JOIN events e ON e.id = o.event_id
+      JOIN ticket_tiers t ON t.id = o.tier_id
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    
+    if (includeTest !== 'true') {
+      sql += ` AND o.is_test = false`;
+    }
+    
+    if (eventId) {
+      params.push(eventId);
+      sql += ` AND o.event_id = $${params.length}`;
+    }
+    
+    if (status) {
+      params.push(status);
+      sql += ` AND o.status = $${params.length}`;
+    }
+    
+    if (startDate) {
+      params.push(startDate);
+      sql += ` AND o.created_at >= $${params.length}`;
+    }
+    
+    if (endDate) {
+      params.push(endDate);
+      sql += ` AND o.created_at <= $${params.length}`;
+    }
+    
+    sql += ` ORDER BY o.created_at DESC`;
+    
+    const orders = await db.queryAll(sql, params);
+    
+    // Generate CSV
+    const headers = [
+      'Order Number', 'Date', 'Buyer Name', 'Buyer Email', 'Buyer Phone',
+      'Event', 'Event Date', 'Tier', 'Quantity', 'Unit Price', 'Total',
+      'Platform Fee', 'Status', 'Payment Method', 'Payment Date', 'Test Order'
+    ];
+    
+    const rows = orders.map(o => [
+      o.order_number,
+      new Date(o.created_at).toISOString(),
+      o.buyer_name,
+      o.buyer_email,
+      o.buyer_phone || '',
+      o.event_name,
+      o.event_date,
+      o.tier_name,
+      o.quantity,
+      o.unit_price,
+      o.total_price,
+      o.platform_fee_amount || 0,
+      o.status,
+      o.payment_method || '',
+      o.payment_confirmed_at ? new Date(o.payment_confirmed_at).toISOString() : '',
+      o.is_test ? 'Yes' : 'No'
+    ]);
+    
+    const csv = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => 
+        typeof cell === 'string' && cell.includes(',') ? `"${cell}"` : cell
+      ).join(','))
+    ].join('\n');
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="orders-${Date.now()}.csv"`);
+    res.send(csv);
   } catch (err) {
     next(err);
   }

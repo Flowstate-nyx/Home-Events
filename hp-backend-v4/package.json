@@ -22,8 +22,13 @@
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^6.9.7",
     "pg": "^8.11.3",
-    "qrcode": "^1.5.3"
+    "qrcode": "^1.5.3",
+    "uuid": "^13.0.0"
   },
-  "keywords": ["tickets", "events", "postgresql"],
+  "keywords": [
+    "tickets",
+    "events",
+    "postgresql"
+  ],
   "license": "UNLICENSED"
 }

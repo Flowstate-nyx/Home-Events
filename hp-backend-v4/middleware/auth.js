@@ -15,10 +15,14 @@
  */
 
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 import pool from '../db/pool.js';
+import * as db from '../db/pool.js';
+import { getConfig } from '../config/env.js';
 import logger from '../utils/logger.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const BCRYPT_ROUNDS = 12;
 
 /**
  * EXISTING: Verify JWT token and attach user to request
@@ -335,6 +339,88 @@ export const canAccessTestOrders = (req, res, next) => {
   next();
 };
 
+// ============================================
+// STARTUP FUNCTIONS (from original auth.js)
+// ============================================
+
+/**
+ * Hash password
+ */
+export async function hashPassword(password) {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
+
+/**
+ * Create admin user
+ */
+export async function createUser(email, password, name, role = 'admin') {
+  const existing = await db.queryOne(
+    `SELECT id FROM users WHERE email = $1`,
+    [email.toLowerCase()]
+  );
+
+  if (existing) {
+    throw new Error('EMAIL_EXISTS');
+  }
+
+  const passwordHash = await hashPassword(password);
+
+  const result = await db.queryOne(
+    `INSERT INTO users (email, password_hash, name, role)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, email, name, role, created_at`,
+    [email.toLowerCase(), passwordHash, name, role]
+  );
+
+  logger.info('User created', { userId: result.id, email: result.email, role });
+
+  return result;
+}
+
+/**
+ * Initialize default admin
+ */
+export async function initDefaultAdmin() {
+  const config = getConfig();
+
+  if (!config.admin.defaultEmail || !config.admin.defaultPassword) {
+    return null;
+  }
+
+  const existing = await db.queryOne(
+    `SELECT id FROM users WHERE email = $1`,
+    [config.admin.defaultEmail.toLowerCase()]
+  );
+
+  if (existing) {
+    return null;
+  }
+
+  const admin = await createUser(
+    config.admin.defaultEmail,
+    config.admin.defaultPassword,
+    'Admin',
+    'superadmin'
+  );
+
+  logger.info('Default admin created', { email: config.admin.defaultEmail });
+
+  return admin;
+}
+
+/**
+ * Cleanup expired tokens
+ */
+export async function cleanupTokens() {
+  const result = await db.query(
+    `DELETE FROM refresh_tokens WHERE expires_at < CURRENT_TIMESTAMP OR revoked_at IS NOT NULL`
+  );
+
+  if (result.rowCount > 0) {
+    logger.info('Cleaned up expired tokens', { count: result.rowCount });
+  }
+}
+
 // Default export for backwards compatibility
 export default {
   requireAuth,
@@ -344,5 +430,9 @@ export default {
   requireClientAccess,
   scopeToClient,
   optionalAuth,
-  canAccessTestOrders
+  canAccessTestOrders,
+  initDefaultAdmin,
+  cleanupTokens,
+  hashPassword,
+  createUser
 };

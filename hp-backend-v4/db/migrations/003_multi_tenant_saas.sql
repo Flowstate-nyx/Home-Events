@@ -163,9 +163,13 @@ CREATE INDEX IF NOT EXISTS idx_customers_test ON customers(is_test_customer) WHE
 CREATE INDEX IF NOT EXISTS idx_customers_tier ON customers(tier);
 
 -- Link orders to customers
-ALTER TABLE orders 
-    ADD CONSTRAINT IF NOT EXISTS fk_orders_customer 
-    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_orders_customer') THEN
+        ALTER TABLE orders ADD CONSTRAINT fk_orders_customer
+            FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 
 -- ============================================
 -- 6. PAYOUTS TABLE (TASK 4)
@@ -412,9 +416,9 @@ ON CONFLICT (email, client_id) DO UPDATE SET
 -- Link existing orders to customers
 UPDATE orders o
 SET customer_id = c.id
-FROM customers c
-JOIN events e ON e.id = o.event_id
-WHERE o.buyer_email = c.email 
+FROM customers c, events e
+WHERE e.id = o.event_id
+AND o.buyer_email = c.email
 AND (c.client_id = e.client_id OR (c.client_id IS NULL AND e.client_id IS NULL))
 AND o.customer_id IS NULL;
 
